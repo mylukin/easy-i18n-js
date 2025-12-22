@@ -20,7 +20,7 @@
     }
   },
   "bin": {
-    "easyi18n": "./bin/easyi18n.mjs"
+    "easyi18n": "bin/easyi18n.mjs"
   },
   "files": [
     "dist",
