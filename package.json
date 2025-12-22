@@ -1,5 +1,5 @@
 {
-  "name": "easy-i18n-cli",
+  "name": "@mylukin/easy-i18n-js",
   "version": "0.1.0",
   "description": "Framework-agnostic i18n extraction tool with plugin support for Svelte, Vue, and more",
   "type": "module",
