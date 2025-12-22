@@ -1,6 +1,6 @@
 {
   "name": "@easyi18n/cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Framework-agnostic i18n extraction tool with plugin support for Svelte, Vue, and more",
   "type": "module",
   "main": "./dist/index.js",
