@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-@easyi18n/cli is a framework-agnostic i18n extraction tool that extracts translation strings from JavaScript, TypeScript, Svelte, and Vue projects. It uses AST parsing (via Babel) with regex fallback for robustness.
+@mylukin/easy-i18n-js is a framework-agnostic i18n extraction tool that extracts translation strings from JavaScript, TypeScript, Svelte, and Vue projects. It uses AST parsing (via Babel) with regex fallback for robustness.
 
 ## Commands
 
@@ -19,6 +19,9 @@ npm run dev            # Watch mode (tsc --watch)
 npm test               # Run vitest in watch mode
 npm run test:run       # Single test run
 npx vitest run __tests__/extractor.test.ts  # Run single test file
+
+# Lint
+npm run lint           # Run ESLint on src/
 
 # CLI usage (after build)
 ./bin/easyi18n.mjs extract -s ./src -o ./locales/en.json
@@ -41,8 +44,8 @@ The tool uses a plugin architecture for framework support:
 
 ### Core Modules
 
-- **extractor.ts**: Main extraction logic, plugin registry, directory scanning with glob patterns
-- **parser.ts**: Babel-based AST parsing for JS/TS, template parsing for SFC files
+- **extractor.ts**: Main extraction logic, plugin registry, directory scanning with glob patterns. Default excludes: `node_modules/**`, `dist/**`, `build/**`, `.svelte-kit/**`, `.nuxt/**`
+- **parser.ts**: Babel-based AST parsing for JS/TS, SFC template parsing, and AST traversal for i18n call extraction. Includes parse caching and error recovery modes.
 - **updater.ts**: Locale file management (read/write JSON, merge, find missing/unused, coverage stats)
 - **cli.ts**: Commander-based CLI with extract, update, status, missing, unused commands
 

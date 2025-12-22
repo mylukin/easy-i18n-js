@@ -1,4 +1,4 @@
-# @easyi18n/cli
+# @mylukin/easy-i18n-js
 
 A framework-agnostic i18n extraction and management tool with plugin support for Svelte, Vue, and more.
 
@@ -15,7 +15,7 @@ A framework-agnostic i18n extraction and management tool with plugin support for
 ## Installation
 
 ```bash
-npm install -D @easyi18n/cli
+npm install -D @mylukin/easy-i18n-js
 
 # For Svelte support
 npm install -D svelte
@@ -72,7 +72,7 @@ import {
   updateLocale,
   readLocaleFile,
   writeLocaleFile
-} from '@easyi18n/cli';
+} from '@mylukin/easy-i18n-js';
 
 // Extract from code string
 const items = extract(`$t('Hello, {name}')`, 'app.js');
@@ -100,7 +100,7 @@ await writeLocaleFile('./locales/zh.json', updated);
 ### Using built-in plugins
 
 ```typescript
-import { registerPlugin, sveltePlugin, vuePlugin } from '@easyi18n/cli';
+import { registerPlugin, sveltePlugin, vuePlugin } from '@mylukin/easy-i18n-js';
 
 // Register plugins
 registerPlugin(sveltePlugin);
@@ -110,7 +110,7 @@ registerPlugin(vuePlugin);
 ### Creating custom plugins
 
 ```typescript
-import type { FrameworkPlugin, ExtractionItem } from '@easyi18n/cli';
+import type { FrameworkPlugin, ExtractionItem } from '@mylukin/easy-i18n-js';
 
 const myPlugin: FrameworkPlugin = {
   name: 'my-framework',
