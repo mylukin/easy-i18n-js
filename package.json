@@ -1,0 +1,91 @@
+{
+  "name": "@easyi18n/cli",
+  "version": "0.1.0",
+  "description": "Framework-agnostic i18n extraction tool with plugin support for Svelte, Vue, and more",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./plugins/svelte": {
+      "types": "./dist/plugins/svelte.d.ts",
+      "import": "./dist/plugins/svelte.js"
+    },
+    "./plugins/vue": {
+      "types": "./dist/plugins/vue.d.ts",
+      "import": "./dist/plugins/vue.js"
+    }
+  },
+  "bin": {
+    "easyi18n": "./bin/easyi18n.mjs"
+  },
+  "files": [
+    "dist",
+    "bin"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "lint": "eslint src",
+    "prepublishOnly": "npm run build && npm run test:run"
+  },
+  "keywords": [
+    "i18n",
+    "internationalization",
+    "localization",
+    "extract",
+    "svelte",
+    "vue",
+    "react",
+    "translation",
+    "locale"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mylukin/easy-i18n-js.git"
+  },
+  "homepage": "https://github.com/mylukin/easy-i18n-js#readme",
+  "bugs": {
+    "url": "https://github.com/mylukin/easy-i18n-js/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@babel/parser": "^7.26.3",
+    "@babel/traverse": "^7.26.4",
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "estree-walker": "^3.0.3",
+    "glob": "^10.4.5",
+    "ora": "^8.1.1"
+  },
+  "peerDependencies": {
+    "@vue/compiler-sfc": ">=3.0.0",
+    "svelte": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "svelte": {
+      "optional": true
+    },
+    "@vue/compiler-sfc": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/babel__traverse": "^7.20.6",
+    "@types/node": "^22.10.2",
+    "@vitest/coverage-v8": "^2.1.9",
+    "@vue/compiler-sfc": "^3.5.13",
+    "svelte": "^5.14.1",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
