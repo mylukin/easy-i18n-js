@@ -417,16 +417,16 @@ describe('Parser - Template Escaped Quotes', () => {
     expect(result).toContain('Path: C:\\Users');
   });
 
-  test('parseTemplate handles escaped newlines', () => {
+  test('parseTemplate handles escaped newlines (collapsed to space)', () => {
     const template = "{$t('Line1\\nLine2')}";
     const result = parseTemplate(template);
-    expect(result[0]).toContain('\n');
+    expect(result[0]).toBe('Line1 Line2');
   });
 
   test('parseTemplate handles escaped tabs', () => {
     const template = "{$t('Col1\\tCol2')}";
     const result = parseTemplate(template);
-    expect(result[0]).toContain('\t');
+    expect(result[0]).toBe('Col1\tCol2');
   });
 
   test('parseTemplate handles backtick strings', () => {

@@ -254,9 +254,9 @@ export function parseTemplate(template: string): string[] {
     // {{ $t(`...`) }} - Vue template with backticks
     { regex: /\{\{\s*\$t\(\s*`((?:[^`\\]|\\.)*)`\s*(?:,[\s\S]*?)?\)\s*\}\}/g, group: 1 },
     // v-t="'...'" - Vue directive with single quotes
-    { regex: /v-t="'((?:[^'\\]|\\.)*)'"/, group: 1 },
+    { regex: new RegExp('v-t="\'((?:[^\'\\\\]|\\\\.)*)\'\"', 'g'), group: 1 },
     // v-t='"..."' - Vue directive with double quotes (inside single)
-    { regex: /v-t='"((?:[^"\\]|\\.)*)"'/, group: 1 },
+    { regex: new RegExp('v-t=\'"((?:[^"\\\\]|\\\\.)*)"\'', 'g'), group: 1 },
   ];
 
   for (const { regex, group } of patterns) {
