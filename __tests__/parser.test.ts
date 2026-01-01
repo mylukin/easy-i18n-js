@@ -5,6 +5,7 @@ import {
   parseSFC,
   parseTemplate,
   extractFromAST,
+  applyPlugins,
   ParseError,
   clearParseCache
 } from '../src/core/parser.js';
@@ -361,7 +362,156 @@ describe('Parser - Cache', () => {
     const result1 = parseJavaScript(code, { cache: true });
     clearParseCache();
     const result2 = parseJavaScript(code, { cache: true });
-    // After clearing, should get new reference
     expect(result1).not.toBe(result2);
+  });
+});
+
+describe('Parser - Plugins', () => {
+  test('applyPlugins applies visitor to AST', () => {
+    const code = `const x = 1;`;
+    const ast = parseJavaScript(code);
+    const visited: string[] = [];
+    const plugin = {
+      visitor: {
+        VariableDeclaration(path: { node: { kind: string } }) {
+          visited.push(path.node.kind);
+        }
+      }
+    };
+    applyPlugins(ast, [plugin]);
+    expect(visited).toContain('const');
+  });
+
+  test('applyPlugins handles plugin without visitor', () => {
+    const code = `const x = 1;`;
+    const ast = parseJavaScript(code);
+    const plugin = { name: 'empty-plugin' };
+    const result = applyPlugins(ast, [plugin]);
+    expect(result).toBeDefined();
+  });
+
+  test('applyPlugins handles empty plugins array', () => {
+    const code = `const x = 1;`;
+    const ast = parseJavaScript(code);
+    const result = applyPlugins(ast, []);
+    expect(result).toBe(ast);
+  });
+});
+
+describe('Parser - Template Escaped Quotes', () => {
+  test('parseTemplate handles escaped single quotes', () => {
+    const template = "{$t('It\\'s working')}";
+    const result = parseTemplate(template);
+    expect(result).toContain("It's working");
+  });
+
+  test('parseTemplate handles escaped double quotes', () => {
+    const template = '{$t("Say \\"Hello\\"")}';
+    const result = parseTemplate(template);
+    expect(result).toContain('Say "Hello"');
+  });
+
+  test('parseTemplate handles escaped backslash', () => {
+    const template = "{$t('Path: C:\\\\Users')}";
+    const result = parseTemplate(template);
+    expect(result).toContain('Path: C:\\Users');
+  });
+
+  test('parseTemplate handles escaped newlines', () => {
+    const template = "{$t('Line1\\nLine2')}";
+    const result = parseTemplate(template);
+    expect(result[0]).toContain('\n');
+  });
+
+  test('parseTemplate handles escaped tabs', () => {
+    const template = "{$t('Col1\\tCol2')}";
+    const result = parseTemplate(template);
+    expect(result[0]).toContain('\t');
+  });
+
+  test('parseTemplate handles backtick strings', () => {
+    const template = "{$t(`Backtick string`)}";
+    const result = parseTemplate(template);
+    expect(result).toContain('Backtick string');
+  });
+
+  test('parseTemplate handles {#t} syntax with single quotes', () => {
+    const template = "{#t 'Special syntax'}";
+    const result = parseTemplate(template);
+    expect(result).toContain('Special syntax');
+  });
+
+  test('parseTemplate handles {#t} syntax with double quotes', () => {
+    const template = '{#t "Special double"}';
+    const result = parseTemplate(template);
+    expect(result).toContain('Special double');
+  });
+});
+
+describe('Parser - AST Edge Cases', () => {
+  test('extractFromAST handles this.$t calls', () => {
+    const code = `this.$t('Method call')`;
+    const ast = parseJavaScript(code);
+    const calls = extractFromAST(ast);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].arguments[0].value).toBe('Method call');
+  });
+
+  test('extractFromAST handles nested object parameters', () => {
+    const code = `$t('Key', { values: { user: { name: 'John' } } })`;
+    const ast = parseJavaScript(code);
+    const calls = extractFromAST(ast);
+    expect(calls).toHaveLength(1);
+  });
+
+  test('extractFromAST handles empty arguments', () => {
+    const code = `$t()`;
+    const ast = parseJavaScript(code);
+    const calls = extractFromAST(ast);
+    expect(calls).toHaveLength(0);
+  });
+
+  test('extractFromAST handles number literals', () => {
+    const code = `$t(123)`;
+    const ast = parseJavaScript(code);
+    const calls = extractFromAST(ast);
+    expect(calls).toHaveLength(0);
+  });
+
+  test('extractFromAST handles variable references', () => {
+    const code = `$t(someVariable)`;
+    const ast = parseJavaScript(code);
+    const calls = extractFromAST(ast);
+    expect(calls).toHaveLength(0);
+  });
+
+  test('extractFromAST handles conditional with non-string branches', () => {
+    const code = `$t(condition ? variable : 'Fallback')`;
+    const ast = parseJavaScript(code);
+    const calls = extractFromAST(ast);
+    expect(calls.some(c => c.arguments[0].value === 'Fallback')).toBe(true);
+  });
+});
+
+describe('Parser - SFC Edge Cases', () => {
+  test('parseSFC handles script with single quote lang', () => {
+    const code = `<script lang='ts'>const x: number = 1;</script>`;
+    const result = parseSFC(code);
+    expect(result.script?.lang).toBe('ts');
+  });
+
+  test('parseSFC handles multiple style tags', () => {
+    const code = `
+      <style>body { margin: 0; }</style>
+      <style scoped>.local { color: red; }</style>
+    `;
+    const result = parseSFC(code);
+    expect(result.style).not.toBeNull();
+  });
+
+  test('parseSFC handles script setup', () => {
+    const code = `<script setup>const x = ref(0);</script>`;
+    const result = parseSFC(code);
+    expect(result.script?.content).toContain('ref');
   });
 });
