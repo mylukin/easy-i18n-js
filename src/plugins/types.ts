@@ -1,4 +1,9 @@
 /**
+ * Type utility for sync or async values
+ */
+export type MaybePromise<T> = T | Promise<T>;
+
+/**
  * Extraction result item representing a single i18n string found in source code
  */
 export interface ExtractionItem {
@@ -113,11 +118,13 @@ export interface FrameworkPlugin {
 
   /**
    * Extract i18n strings from source code
+   * Supports both sync and async implementations.
+   * AST-based parsing (async) is preferred, with regex as fallback.
    * @param code - Source code content
    * @param file - File path for error reporting
-   * @returns Array of extraction results
+   * @returns Array of extraction results (sync or async)
    */
-  extract(code: string, file: string): ExtractionItem[];
+  extract(code: string, file: string): MaybePromise<ExtractionItem[]>;
 
   /**
    * Check if the framework dependency is available

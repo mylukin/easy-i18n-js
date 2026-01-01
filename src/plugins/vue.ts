@@ -231,7 +231,10 @@ async function extractFromVueSFC(code: string, file: string): Promise<Extraction
     return extractWithRegex(code, file);
   }
 
-  // Deduplicate results
+  if (results.length === 0) {
+    return extractWithRegex(code, file);
+  }
+
   const uniqueResults: ExtractionItem[] = [];
   const seen = new Set<string>();
 
@@ -247,25 +250,52 @@ async function extractFromVueSFC(code: string, file: string): Promise<Extraction
 
 /**
  * Regex-based extraction fallback for Vue files
+ * Uses patterns that properly handle escaped quotes
  */
 function extractWithRegex(code: string, file: string): ExtractionItem[] {
   const results: ExtractionItem[] = [];
 
-  // Combined patterns for both template and script
-  const patterns = [
-    /\{\{\s*\$t\(\s*['"`]([\s\S]*?)['"`][\s\S]*?\)\s*\}\}/g,
-    /\{\{\s*t\(\s*['"`]([\s\S]*?)['"`][\s\S]*?\)\s*\}\}/g,
-    /\$t\(\s*['"`]([\s\S]*?)['"`][\s\S]*?\)/g,
-    /\bt\(\s*['"`]([\s\S]*?)['"`][\s\S]*?\)/g,
-    /v-t=["']([^"']+)["']/g,
-    /i18n\.t\(\s*['"`]([\s\S]*?)['"`][\s\S]*?\)/g,
-    /this\.\$t\(\s*['"`]([\s\S]*?)['"`][\s\S]*?\)/g
+  // Patterns that handle escaped quotes: (?:[^'\\]|\\.)* 
+  const patterns: Array<{ regex: RegExp; group: number }> = [
+    // {{ $t('...') }} or {{ $t("...") }}
+    { regex: /\{\{\s*\$t\(\s*'((?:[^'\\]|\\.)*)'\s*(?:,[\s\S]*?)?\)\s*\}\}/g, group: 1 },
+    { regex: /\{\{\s*\$t\(\s*"((?:[^"\\]|\\.)*)"\s*(?:,[\s\S]*?)?\)\s*\}\}/g, group: 1 },
+    { regex: /\{\{\s*\$t\(\s*`((?:[^`\\]|\\.)*)`\s*(?:,[\s\S]*?)?\)\s*\}\}/g, group: 1 },
+    // {{ t('...') }}
+    { regex: /\{\{\s*t\(\s*'((?:[^'\\]|\\.)*)'\s*(?:,[\s\S]*?)?\)\s*\}\}/g, group: 1 },
+    { regex: /\{\{\s*t\(\s*"((?:[^"\\]|\\.)*)"\s*(?:,[\s\S]*?)?\)\s*\}\}/g, group: 1 },
+    { regex: /\{\{\s*t\(\s*`((?:[^`\\]|\\.)*)`\s*(?:,[\s\S]*?)?\)\s*\}\}/g, group: 1 },
+    // $t('...') in attributes or script
+    { regex: /\$t\(\s*'((?:[^'\\]|\\.)*)'\s*(?:,[\s\S]*?)?\)/g, group: 1 },
+    { regex: /\$t\(\s*"((?:[^"\\]|\\.)*)"\s*(?:,[\s\S]*?)?\)/g, group: 1 },
+    { regex: /\$t\(\s*`((?:[^`\\]|\\.)*)`\s*(?:,[\s\S]*?)?\)/g, group: 1 },
+    // t('...') standalone
+    { regex: /\bt\(\s*'((?:[^'\\]|\\.)*)'\s*(?:,[\s\S]*?)?\)/g, group: 1 },
+    { regex: /\bt\(\s*"((?:[^"\\]|\\.)*)"\s*(?:,[\s\S]*?)?\)/g, group: 1 },
+    { regex: /\bt\(\s*`((?:[^`\\]|\\.)*)`\s*(?:,[\s\S]*?)?\)/g, group: 1 },
+    // v-t="'...'" directive
+    { regex: /v-t=["']([^"']+)["']/g, group: 1 },
+    // i18n.t('...')
+    { regex: /i18n\.t\(\s*'((?:[^'\\]|\\.)*)'\s*(?:,[\s\S]*?)?\)/g, group: 1 },
+    { regex: /i18n\.t\(\s*"((?:[^"\\]|\\.)*)"\s*(?:,[\s\S]*?)?\)/g, group: 1 },
+    // this.$t('...')
+    { regex: /this\.\$t\(\s*'((?:[^'\\]|\\.)*)'\s*(?:,[\s\S]*?)?\)/g, group: 1 },
+    { regex: /this\.\$t\(\s*"((?:[^"\\]|\\.)*)"\s*(?:,[\s\S]*?)?\)/g, group: 1 },
   ];
 
-  for (const pattern of patterns) {
+  for (const { regex, group } of patterns) {
+    regex.lastIndex = 0;
     let match;
-    while ((match = pattern.exec(code)) !== null) {
-      const key = match[1].replace(/\s*\n\s*/g, ' ').trim();
+    while ((match = regex.exec(code)) !== null) {
+      const rawKey = match[group];
+      const key = rawKey
+        .replace(/\\'/g, "'")
+        .replace(/\\"/g, '"')
+        .replace(/\\n/g, '\n')
+        .replace(/\\t/g, '\t')
+        .replace(/\\\\/g, '\\')
+        .replace(/\s*\n\s*/g, ' ')
+        .trim();
 
       if (!key) continue;
 
@@ -306,9 +336,12 @@ export const vuePlugin: FrameworkPlugin = {
   name: 'vue',
   extensions: ['.vue'],
 
-  extract(code: string, file: string): ExtractionItem[] {
-    // Use regex fallback for sync context
-    // For full SFC support, use extractFromVueAsync
+  async extract(code: string, file: string): Promise<ExtractionItem[]> {
+    try {
+      return await extractFromVueSFC(code, file);
+    } catch {
+      // SFC parsing failed, use regex fallback
+    }
     return extractWithRegex(code, file);
   },
 
@@ -318,15 +351,10 @@ export const vuePlugin: FrameworkPlugin = {
 };
 
 /**
- * Async extraction with full SFC support
- * Use this when async operations are acceptable
+ * Async extraction with full SFC support (legacy export for backward compatibility)
  */
 export async function extractFromVueAsync(code: string, file: string): Promise<ExtractionItem[]> {
-  try {
-    return await extractFromVueSFC(code, file);
-  } catch {
-    return extractWithRegex(code, file);
-  }
+  return vuePlugin.extract(code, file);
 }
 
 /**

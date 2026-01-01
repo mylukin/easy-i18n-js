@@ -196,6 +196,20 @@ export function parseSFC(code: string, _options: ParserOptions = {}): {
 }
 
 /**
+ * Unescape a string that may contain escape sequences
+ */
+function unescapeString(str: string): string {
+  return str
+    .replace(/\\'/g, "'")
+    .replace(/\\"/g, '"')
+    .replace(/\\`/g, '`')
+    .replace(/\\n/g, '\n')
+    .replace(/\\t/g, '\t')
+    .replace(/\\r/g, '\r')
+    .replace(/\\\\/g, '\\');
+}
+
+/**
  * Parse template syntax and extract i18n strings using regex
  * Works for both Svelte and Vue template syntax
  */
@@ -203,22 +217,55 @@ export function parseTemplate(template: string): string[] {
   const results: string[] = [];
 
   // Patterns for various i18n function calls
-  // Uses [\s\S] to match across newlines
+  // Each quote type handled separately to properly support escaped quotes
+  // Pattern explanation: (?:[^'\\]|\\.)* means "match any char except ' and \, OR match \ followed by any char"
   const patterns = [
-    /\{\$t\(\s*['"`]([\s\S]*?)['"`][\s\S]*?\)\}/g,  // {$t('...')}
-    /\{t\(\s*['"`]([\s\S]*?)['"`][\s\S]*?\)\}/g,    // {t('...')}
-    /\{#t\s+['"`]([\s\S]*?)['"`]\}/g,               // {#t '...'} (Svelte)
-    /\$t\(\s*['"`]([\s\S]*?)['"`][\s\S]*?\)/g,      // $t('...')
-    /\bt\(\s*['"`]([\s\S]*?)['"`][\s\S]*?\)/g,      // t('...')
-    /\{\{\s*\$t\(\s*['"`]([\s\S]*?)['"`][\s\S]*?\)\s*\}\}/g,  // {{ $t('...') }} (Vue)
-    /v-t="['"`]([\s\S]*?)['"`]"/g,                  // v-t="'...'" (Vue directive)
+    // {$t('...')} - Svelte template with single quotes
+    { regex: /\{\$t\(\s*'((?:[^'\\]|\\.)*)'\s*(?:,[\s\S]*?)?\)\}/g, group: 1 },
+    // {$t("...")} - Svelte template with double quotes
+    { regex: /\{\$t\(\s*"((?:[^"\\]|\\.)*)"\s*(?:,[\s\S]*?)?\)\}/g, group: 1 },
+    // {$t(`...`)} - Svelte template with backticks
+    { regex: /\{\$t\(\s*`((?:[^`\\]|\\.)*)`\s*(?:,[\s\S]*?)?\)\}/g, group: 1 },
+    // {t('...')} - Svelte with single quotes
+    { regex: /\{t\(\s*'((?:[^'\\]|\\.)*)'\s*(?:,[\s\S]*?)?\)\}/g, group: 1 },
+    // {t("...")} - Svelte with double quotes
+    { regex: /\{t\(\s*"((?:[^"\\]|\\.)*)"\s*(?:,[\s\S]*?)?\)\}/g, group: 1 },
+    // {t(`...`)} - Svelte with backticks
+    { regex: /\{t\(\s*`((?:[^`\\]|\\.)*)`\s*(?:,[\s\S]*?)?\)\}/g, group: 1 },
+    // {#t '...'} - Svelte special syntax
+    { regex: /\{#t\s+'((?:[^'\\]|\\.)*)'\}/g, group: 1 },
+    { regex: /\{#t\s+"((?:[^"\\]|\\.)*)"\}/g, group: 1 },
+    // $t('...') - standalone function call with single quotes
+    { regex: /\$t\(\s*'((?:[^'\\]|\\.)*)'\s*(?:,[\s\S]*?)?\)/g, group: 1 },
+    // $t("...") - standalone function call with double quotes
+    { regex: /\$t\(\s*"((?:[^"\\]|\\.)*)"\s*(?:,[\s\S]*?)?\)/g, group: 1 },
+    // $t(`...`) - standalone function call with backticks
+    { regex: /\$t\(\s*`((?:[^`\\]|\\.)*)`\s*(?:,[\s\S]*?)?\)/g, group: 1 },
+    // t('...') - standalone t() with single quotes
+    { regex: /\bt\(\s*'((?:[^'\\]|\\.)*)'\s*(?:,[\s\S]*?)?\)/g, group: 1 },
+    // t("...") - standalone t() with double quotes
+    { regex: /\bt\(\s*"((?:[^"\\]|\\.)*)"\s*(?:,[\s\S]*?)?\)/g, group: 1 },
+    // t(`...`) - standalone t() with backticks
+    { regex: /\bt\(\s*`((?:[^`\\]|\\.)*)`\s*(?:,[\s\S]*?)?\)/g, group: 1 },
+    // {{ $t('...') }} - Vue template with single quotes
+    { regex: /\{\{\s*\$t\(\s*'((?:[^'\\]|\\.)*)'\s*(?:,[\s\S]*?)?\)\s*\}\}/g, group: 1 },
+    // {{ $t("...") }} - Vue template with double quotes
+    { regex: /\{\{\s*\$t\(\s*"((?:[^"\\]|\\.)*)"\s*(?:,[\s\S]*?)?\)\s*\}\}/g, group: 1 },
+    // {{ $t(`...`) }} - Vue template with backticks
+    { regex: /\{\{\s*\$t\(\s*`((?:[^`\\]|\\.)*)`\s*(?:,[\s\S]*?)?\)\s*\}\}/g, group: 1 },
+    // v-t="'...'" - Vue directive with single quotes
+    { regex: /v-t="'((?:[^'\\]|\\.)*)'"/, group: 1 },
+    // v-t='"..."' - Vue directive with double quotes (inside single)
+    { regex: /v-t='"((?:[^"\\]|\\.)*)"'/, group: 1 },
   ];
 
-  for (const pattern of patterns) {
+  for (const { regex, group } of patterns) {
     let match;
-    while ((match = pattern.exec(template)) !== null) {
-      // Clean multiline strings
-      const cleanedString = match[1]
+    while ((match = regex.exec(template)) !== null) {
+      // Unescape and clean multiline strings
+      const rawString = match[group];
+      const unescaped = unescapeString(rawString);
+      const cleanedString = unescaped
         .replace(/\s*\n\s*/g, ' ')
         .trim();
       results.push(cleanedString);

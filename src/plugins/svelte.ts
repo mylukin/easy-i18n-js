@@ -240,20 +240,50 @@ async function extractFromSvelteAST(code: string, file: string): Promise<Extract
 
 /**
  * Regex-based fallback extraction for Svelte files
+ * Uses patterns that properly handle escaped quotes
  */
 function extractWithRegex(code: string, file: string): ExtractionItem[] {
   const results: ExtractionItem[] = [];
-  const patterns = [
-    /\{\$t\(\s*['"`]([\s\S]*?)['"`][\s\S]*?\)\}/g,
-    /\{t\(\s*['"`]([\s\S]*?)['"`][\s\S]*?\)\}/g,
-    /\$t\(\s*['"`]([\s\S]*?)['"`][\s\S]*?\)/g,
-    /\bt\(\s*['"`]([\s\S]*?)['"`][\s\S]*?\)/g
+  
+  // Patterns that handle escaped quotes: (?:[^'\\]|\\.)* matches:
+  // - [^'\\] = any char except ' or \
+  // - \\. = backslash followed by any char (escaped char)
+  const patterns: Array<{ regex: RegExp; group: number }> = [
+    // {$t('...')} or {$t("...")} or {$t(`...`)}
+    { regex: /\{\$t\(\s*'((?:[^'\\]|\\.)*)'\s*(?:,[\s\S]*?)?\)\}/g, group: 1 },
+    { regex: /\{\$t\(\s*"((?:[^"\\]|\\.)*)"\s*(?:,[\s\S]*?)?\)\}/g, group: 1 },
+    { regex: /\{\$t\(\s*`((?:[^`\\]|\\.)*)`\s*(?:,[\s\S]*?)?\)\}/g, group: 1 },
+    // {t('...')} or {t("...")} or {t(`...`)}
+    { regex: /\{t\(\s*'((?:[^'\\]|\\.)*)'\s*(?:,[\s\S]*?)?\)\}/g, group: 1 },
+    { regex: /\{t\(\s*"((?:[^"\\]|\\.)*)"\s*(?:,[\s\S]*?)?\)\}/g, group: 1 },
+    { regex: /\{t\(\s*`((?:[^`\\]|\\.)*)`\s*(?:,[\s\S]*?)?\)\}/g, group: 1 },
+    // $t('...') or $t("...") or $t(`...`) - in script section
+    { regex: /\$t\(\s*'((?:[^'\\]|\\.)*)'\s*(?:,[\s\S]*?)?\)/g, group: 1 },
+    { regex: /\$t\(\s*"((?:[^"\\]|\\.)*)"\s*(?:,[\s\S]*?)?\)/g, group: 1 },
+    { regex: /\$t\(\s*`((?:[^`\\]|\\.)*)`\s*(?:,[\s\S]*?)?\)/g, group: 1 },
+    // t('...') or t("...") - standalone t() calls
+    { regex: /\bt\(\s*'((?:[^'\\]|\\.)*)'\s*(?:,[\s\S]*?)?\)/g, group: 1 },
+    { regex: /\bt\(\s*"((?:[^"\\]|\\.)*)"\s*(?:,[\s\S]*?)?\)/g, group: 1 },
+    { regex: /\bt\(\s*`((?:[^`\\]|\\.)*)`\s*(?:,[\s\S]*?)?\)/g, group: 1 },
   ];
 
-  for (const pattern of patterns) {
+  for (const { regex, group } of patterns) {
+    regex.lastIndex = 0;
     let match;
-    while ((match = pattern.exec(code)) !== null) {
-      const key = match[1].replace(/\s*\n\s*/g, ' ').trim();
+    while ((match = regex.exec(code)) !== null) {
+      // Unescape the captured string (convert \' to ', \" to ", etc.)
+      const rawKey = match[group];
+      const key = rawKey
+        .replace(/\\'/g, "'")
+        .replace(/\\"/g, '"')
+        .replace(/\\n/g, '\n')
+        .replace(/\\t/g, '\t')
+        .replace(/\\\\/g, '\\')
+        .replace(/\s*\n\s*/g, ' ')
+        .trim();
+      
+      if (!key) continue;
+
       const item: ExtractionItem = {
         key,
         file,
@@ -291,10 +321,15 @@ export const sveltePlugin: FrameworkPlugin = {
   name: 'svelte',
   extensions: ['.svelte'],
 
-  extract(code: string, file: string): ExtractionItem[] {
-    // We need to use async extraction internally but return sync
-    // This is a limitation - we'll use regex fallback for sync context
-    // For full AST support, use extractFromSvelteAsync
+  async extract(code: string, file: string): Promise<ExtractionItem[]> {
+    try {
+      const results = await extractFromSvelteAST(code, file);
+      if (results.length > 0) {
+        return results;
+      }
+    } catch {
+      // AST parsing failed, continue to regex fallback
+    }
     return extractWithRegex(code, file);
   },
 
@@ -304,20 +339,10 @@ export const sveltePlugin: FrameworkPlugin = {
 };
 
 /**
- * Async extraction with full AST support
- * Use this when async operations are acceptable
+ * Async extraction with full AST support (legacy export for backward compatibility)
  */
 export async function extractFromSvelteAsync(code: string, file: string): Promise<ExtractionItem[]> {
-  try {
-    const results = await extractFromSvelteAST(code, file);
-    if (results.length > 0) {
-      return results;
-    }
-    // Fall back to regex if AST didn't find anything
-    return extractWithRegex(code, file);
-  } catch {
-    return extractWithRegex(code, file);
-  }
+  return sveltePlugin.extract(code, file);
 }
 
 /**
